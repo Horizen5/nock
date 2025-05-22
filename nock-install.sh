@@ -100,29 +100,61 @@ function build_and_configure() {
     pause_and_return
     return
   fi
+
   cd "$NCK_DIR" || { echo -e "${RED}[-] 无法进入 nockchain 目录！${RESET}"; pause_and_return; return; }
+
+  # 获取并行编译核心数（总核心数 - 1，最少保留 1 个）
+  CPU_CORES=$(nproc)
+  JOBS=$((CPU_CORES > 1 ? CPU_CORES - 1 : 1))
+
+  echo -e "[*] 并行编译核心数：$JOBS"
+
   echo -e "[*] 编译核心组件..."
-  make install-hoonc || { echo -e "${RED}[-] 执行 make install-hoonc 失败，请检查 Makefile 或依赖！${RESET}"; pause_and_return; return; }
+  make -j"$JOBS" install-hoonc || {
+    echo -e "${RED}[-] 执行 make install-hoonc 失败，请检查 Makefile 或依赖！${RESET}"
+    pause_and_return
+    return
+  }
+
   if command -v hoonc &> /dev/null; then
     echo -e "[*] hoonc 安装成功，可用命令：hoonc"
   else
     echo -e "${YELLOW}[!] 警告：hoonc 命令不可用，安装可能不完整。${RESET}"
   fi
-  make build || { echo -e "${RED}[-] 执行 make build 失败，请检查 Makefile 或依赖！${RESET}"; pause_and_return; return; }
-  make install-nockchain-wallet || { echo -e "${RED}[-] 执行 make install-nockchain-wallet 失败，请检查 Makefile 或依赖！${RESET}"; pause_and_return; return; }
-  make install-nockchain || { echo -e "${RED}[-] 执行 make install-nockchain 失败，请检查 Makefile 或依赖！${RESET}"; pause_and_return; return; }
+
+  make -j"$JOBS" build || {
+    echo -e "${RED}[-] 执行 make build 失败，请检查 Makefile 或依赖！${RESET}"
+    pause_and_return
+    return
+  }
+
+  make -j"$JOBS" install-nockchain-wallet || {
+    echo -e "${RED}[-] 执行 make install-nockchain-wallet 失败，请检查 Makefile 或依赖！${RESET}"
+    pause_and_return
+    return
+  }
+
+  make -j"$JOBS" install-nockchain || {
+    echo -e "${RED}[-] 执行 make install-nockchain 失败，请检查 Makefile 或依赖！${RESET}"
+    pause_and_return
+    return
+  }
+
   echo -e "[*] 配置环境变量..."
   RC_FILE="$HOME/.bashrc"
   [[ "$SHELL" == *"zsh"* ]] && RC_FILE="$HOME/.zshrc"
+
   if ! grep -q "$NCK_DIR/target/release" "$RC_FILE"; then
     echo "export PATH=\"\$PATH:$NCK_DIR/target/release\"" >> "$RC_FILE"
     source "$RC_FILE" || echo -e "${YELLOW}[!] 无法立即应用环境变量，请手动 source $RC_FILE 或重新打开终端。${RESET}"
   else
     source "$RC_FILE" || echo -e "${YELLOW}[!] 无法立即应用环境变量，请手动 source $RC_FILE 或重新打开终端。${RESET}"
   fi
+
   echo -e "${GREEN}[+] 编译和环境变量配置完成。${RESET}"
   pause_and_return
 }
+
 
 # ========= 生成钱包 =========
 function generate_wallet() {
